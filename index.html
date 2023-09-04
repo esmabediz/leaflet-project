@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Leaflet Project</title>
+
+
+    <link rel="stylesheet" href="libs/bootstrap/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<style>
+    #map{
+        width: 100%;
+        height: 500px;
+    }
+    li {
+    list-style: none;
+}
+
+.container {
+    max-width: 80vw !important;
+}
+
+
+label {
+    padding-left: 10px !important;
+}
+
+#saveButton {
+    margin-top: 15px;
+}
+</style>
+</head>
+
+<body>
+    <h1>Harita Uygulaması</h1>
+    <div class="container">
+        <div class="row">
+            <div class="col-md-6">
+                <div id="map"></div>
+                <button id="saveButton" class="btn btn-success">Noktayı Kaydet</button>
+            </div>
+
+            <div class="col-md-6">
+                <div id="pointList">
+                    <h2>Kaydedilen Noktalar:</h2>
+                    <ul id="listItems"></ul>
+                </div>
+                <button id="deleteButton" class="btn btn-warning">Sil</button>
+                <button id="downloadButton" onclick="downloadData()" class="btn btn-success">İndir</button>
+
+            </div>
+        </div>
+    </div>
+
+
+
+
+    <script>var map = L.map('map').setView([37.05612, 29.10999], 13);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors',
+            maxZoom: 18
+        }).addTo(map);
+
+        var saveButton = document.getElementById('saveButton');
+        saveButton.addEventListener('click', function () {
+            var center = map.getCenter();
+            var lat = center.lat.toFixed(5);
+            var lng = center.lng.toFixed(5);
+            var dateTime = new Date().toISOString();
+            savePoint(lat, lng, dateTime);
+            console.log(lat);
+            console.log(lng);
+            console.log(dateTime);
+        });
+
+        var markers = [];
+
+        function savePoint(lat, lng, dateTime) {
+            var listItem = document.createElement('li');
+            var checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.className = 'pointCheckbox';
+
+            checkbox.addEventListener('change', function () {
+                if (checkbox.checked) {
+                    createMarker(lat, lng);
+                } else {
+                    removeMarker(lat, lng);
+                }
+            });
+
+            listItem.appendChild(checkbox);
+
+            var label = document.createElement('label');
+            label.textContent = 'Latitude: ' + lat + ', Longitude: ' + lng + ', Date/Time: ' + dateTime;
+            console.log(label);
+
+            listItem.appendChild(label);
+            document.getElementById('listItems').appendChild(listItem);
+        }
+
+        function downloadData() {
+            var savedPoints = [];
+
+            // Kaydedilen noktaları topluyoruz
+            var listItems = document.querySelectorAll('#listItems li');
+            listItems.forEach(function (item) {
+                var label = item.querySelector('label');
+                var text = label.textContent;
+                var latLng = text.match(/Latitude: ([\d.]+), Longitude: ([\d.]+), Date\/Time: (.+)/);
+
+                if (latLng && latLng.length === 4) {
+                    savedPoints.push({
+                        lat: latLng[1],
+                        lng: latLng[2],
+                        datetime: latLng[3]
+                    });
+                }
+            });
+
+            if (savedPoints.length === 0) {
+                console.log('Kaydedilmiş nokta bulunamadı.');
+                return;
+            }
+
+            var jsonData = JSON.stringify(savedPoints, null, 2);
+            var blob = new Blob([jsonData], { type: 'application/json' });
+            var url = URL.createObjectURL(blob);
+            var downloadLink = document.createElement('a');
+            downloadLink.href = url;
+            downloadLink.download = 'saved_points.json';
+            downloadLink.click();
+        }
+
+        var listItems = document.querySelectorAll('#listItems li');
+        listItems.forEach(function (item) {
+            item.addEventListener('click', function () {
+                var index = Array.prototype.indexOf.call(listItems, item);
+                createMarker(index);
+            });
+        });
+
+        var blueIcon = L.icon({
+            iconUrl: 'img/marker-icon.png',
+            iconSize: [25, 41],
+            iconAnchor: [12, 41],
+            popupAnchor: [1, -34]
+        });
+
+        function createMarker(lat, lng) {
+            var marker = L.marker([lat, lng], { icon: blueIcon }).addTo(map);
+            markers.push({ lat, lng, marker });
+        }
+
+        listItems.forEach(function (item) {
+            item.addEventListener('contextmenu', function (event) {
+                event.preventDefault();
+                var index = Array.prototype.indexOf.call(listItems, item);
+                deleteMarker(index);
+                deleteItem(index);
+                item.remove();
+            });
+        });
+
+        function deleteItem(index) {
+            item.addEventListener('contextmenu', function (event) {
+                item.remove(index);
+            });
+        }
+
+        function removeMarker(lat, lng) {
+            var index = findMarkerIndex(lat, lng);
+            if (index !== -1) {
+                var markerData = markers[index];
+                markerData.marker.remove();
+                markers.splice(index, 1);
+            }
+        }
+        function findMarkerIndex(lat, lng) {
+            for (var i = 0; i < markers.length; i++) {
+                var markerData = markers[i];
+                if (markerData.lat === lat && markerData.lng === lng) {
+                    return i;
+                }
+            }
+            return -1;
+        }
+
+
+        var deleteButton = document.getElementById("deleteButton");
+        deleteButton.addEventListener('click', function () {
+            deleteSelectedPoints();
+        });
+
+        function deleteSelectedPoints() {
+            var checkboxes = document.querySelectorAll('.pointCheckbox:checked');
+
+            checkboxes.forEach(function (checkbox) {
+                var listItem = checkbox.parentElement;
+                var label = listItem.querySelector('label');
+                var text = label.textContent;
+                var latLng = text.match(/Latitude: ([\d.]+), Longitude: ([\d.]+), Date\/Time: (.+)/);
+                if (latLng && latLng.length === 4) {
+                    var lat = latLng[1];
+                    var lng = latLng[2];
+                    removeSavedPoint(lat, lng);
+                }
+            });
+            console.log(checkboxes.checked);
+        }
+        function removeSavedPoint(lat, lng) {
+            var listItems = document.querySelectorAll('#listItems li');
+            listItems.forEach(function (item) {
+                var label = item.querySelector('label');
+                var text = label.textContent;
+                var latLng = text.match(/Latitude: ([\d.]+), Longitude: ([\d.]+), Date\/Time: (.+)/);
+
+                if (latLng && latLng.length === 4) {
+                    var itemLat = latLng[1];
+                    var itemLng = latLng[2];
+                    if (itemLat === lat && itemLng === lng) {
+                        item.remove();
+                    }
+                }
+            })
+
+
+            removeMarker(lat, lng);
+            console.log("RemoveSavedPoint fonksiyonuna geldi");
+        }</script>
+</body>
+
+</html>
